@@ -1,0 +1,48 @@
+use std::net::TcpStream;
+use std::io::{self, BufRead, BufReader, Write, Error};
+use std::thread;
+
+fn main() -> Result<(), Error> {
+    let mut stream = TcpStream::connect("127.0.0.1:8888")?;
+    println!("Connected to server on port 8888");
+
+    let reader = BufReader::new(stream.try_clone()?);
+
+    //handle incoming messages from the server
+    thread::spawn(move || {
+        let mut reader = reader;
+        let mut buffer = String::new();
+        loop {
+            match reader.read_line(&mut buffer) {
+                Ok(bytes_read) => {
+                    if bytes_read > 0 {
+                        println!("Received from server: {}", buffer.trim());
+                    }
+                    buffer.clear(); 
+                }
+                Err(err) => {
+                    eprintln!("Error reading from server: {}", err);
+                    break;
+                }
+            }
+        }
+    });
+
+    let mut input = String::new();
+    loop {
+        io::stdin().read_line(&mut input)?;
+
+        stream.write_all(input.as_bytes())?;
+        println!("Message sent to server: {}", input.trim());
+
+        if input.trim() == "quit" {
+            break;
+        }
+
+        input.clear(); 
+    }
+
+    stream.shutdown(std::net::Shutdown::Both)?;
+    println!("Disconnected from server.");
+    Ok(())
+}
